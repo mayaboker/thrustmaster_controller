@@ -11,12 +11,12 @@ inspected too.
 
 ## Run
 
-Python 3.10+ and access to the Linux input device are required.
+Python 3.10+, [uv](https://docs.astral.sh/uv/getting-started/installation/),
+and access to the Linux input device are required.
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -e .
-.venv/bin/thrustmaster-controller
+uv sync
+uv run thrustmaster-controller
 ```
 
 If the USB device is shown but input cannot be opened, add your user to the
@@ -29,9 +29,9 @@ sudo usermod -aG input "$USER"
 Useful options:
 
 ```bash
-thrustmaster-controller --list       # print matching USB devices and exit
-thrustmaster-controller --demo       # exercise the UI without hardware
-thrustmaster-controller --sysfs-root /path/to/fixture
+uv run thrustmaster-controller --list       # print matching USB devices and exit
+uv run thrustmaster-controller --demo       # exercise the UI without hardware
+uv run thrustmaster-controller --sysfs-root /path/to/fixture
 ```
 
 Press `R` to rescan, `F` to toggle fullscreen, and `Esc` to exit.
@@ -53,9 +53,12 @@ gamepad mapping, and the prototype must show all of them.
 ## Development
 
 ```bash
-.venv/bin/pip install -e '.[test]'
-.venv/bin/pytest
+uv sync
+uv run pytest
 ```
+
+`uv.lock` is committed; use `uv lock --upgrade` when intentionally updating
+dependencies.
 
 The repository's default branch is `develop`; hardware bring-up work is on
 `feature/bringup`.

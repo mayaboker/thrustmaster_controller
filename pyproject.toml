@@ -12,8 +12,8 @@ license = "MIT"
 authors = [{ name = "mayaboker" }]
 dependencies = ["pygame-ce>=2.5.3,<3"]
 
-[project.optional-dependencies]
-test = ["pytest>=8.3,<9"]
+[dependency-groups]
+dev = ["pytest>=8.3,<9"]
 
 [project.scripts]
 thrustmaster-controller = "thrustmaster_controller.app:main"
