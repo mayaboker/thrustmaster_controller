@@ -13,7 +13,7 @@ def demo_snapshot(elapsed_seconds: float) -> ControllerSnapshot:
     hat_step = int(phase * 1.5) % 9
     hats = ((-1, 1), (0, 1), (1, 1), (-1, 0), (0, 0), (1, 0), (-1, -1), (0, -1), (1, -1))
     return ControllerSnapshot(
-        name="Thrustmaster demo controller",
+        name="Thrustmaster T.16000M (demo)",
         guid="demo-044f",
         axes=(
             math.sin(phase * 1.2),

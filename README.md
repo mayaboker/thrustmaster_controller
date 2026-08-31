@@ -2,7 +2,9 @@
 
 A Linux desktop prototype that finds Thrustmaster hardware on the USB bus and
 visualizes every input exposed by the controller: buttons, axes, and hat
-switches. Devices can be plugged and unplugged while the app is running.
+switches. The T.16000M view places zero-based buttons directly over their
+physical locations. Devices can be plugged and unplugged while the app is
+running.
 
 The bring-up was developed against a T.16000M (`044f:b10a`), but no model-specific
 button count or report layout is hard-coded. The UI is generated from the inputs

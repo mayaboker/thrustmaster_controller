@@ -21,6 +21,9 @@ thrustmaster-controller = "thrustmaster_controller.app:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+thrustmaster_controller = ["assets/*.jpg"]
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]

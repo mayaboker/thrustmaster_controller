@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from importlib.resources import files
 import math
 from typing import Any, Sequence
 
@@ -20,6 +21,28 @@ ACCENT = (43, 214, 177)
 ACCENT_DARK = (18, 92, 83)
 ACTIVE = (255, 193, 77)
 DANGER = (244, 99, 105)
+
+# Button centers measured from the supplied 1206 × 954 T.16000M reference
+# diagram. Normalized coordinates keep the overlay aligned at every UI size.
+T16000M_BUTTON_POSITIONS: dict[int, tuple[float, float]] = {
+    0: (0.492, 0.284),
+    1: (0.500, 0.607),
+    2: (0.396, 0.473),
+    3: (0.603, 0.461),
+    4: (0.292, 0.472),
+    5: (0.322, 0.506),
+    6: (0.355, 0.554),
+    7: (0.348, 0.661),
+    8: (0.315, 0.602),
+    9: (0.284, 0.547),
+    10: (0.700, 0.479),
+    11: (0.669, 0.514),
+    12: (0.639, 0.556),
+    13: (0.640, 0.674),
+    14: (0.671, 0.606),
+    15: (0.706, 0.565),
+}
+T16000M_STICK_CENTER = (0.500, 0.456)
 
 
 @dataclass(slots=True)
@@ -38,6 +61,30 @@ class Dashboard:
         self.font_large = pg.font.Font(None, 40)
         self.previous: ControllerSnapshot | None = None
         self.activity: deque[Activity] = deque(maxlen=5)
+        self.diagram_source = self._load_diagram()
+        self.diagram_cache: tuple[tuple[int, int], Any] | None = None
+
+    def _load_diagram(self) -> Any | None:
+        """Load and color-grade the packaged layout for the dark dashboard."""
+
+        try:
+            asset = files("thrustmaster_controller").joinpath("assets/t16000m-button-layout.jpg")
+            raw = self.pg.image.load(str(asset)).convert()
+        except (FileNotFoundError, OSError, self.pg.error):
+            return None
+
+        # Invert the monochrome reference, tint its linework blue-gray, and
+        # composite it onto the exact panel color. This preserves the precise
+        # source geometry without leaving a glaring white rectangle in the UI.
+        gray = self.pg.transform.grayscale(raw)
+        inverted = self.pg.Surface(raw.get_size())
+        inverted.fill((255, 255, 255))
+        inverted.blit(gray, (0, 0), special_flags=self.pg.BLEND_RGB_SUB)
+        inverted.fill((116, 142, 160), special_flags=self.pg.BLEND_RGB_MULT)
+        graded = self.pg.Surface(raw.get_size())
+        graded.fill(PANEL)
+        graded.blit(inverted, (0, 0), special_flags=self.pg.BLEND_RGB_ADD)
+        return graded
 
     def _text(
         self,
@@ -69,7 +116,7 @@ class Dashboard:
             for index, value in enumerate(snapshot.buttons):
                 old = previous.buttons[index] if index < len(previous.buttons) else False
                 if value != old:
-                    self.activity.appendleft(Activity(f"Button {index + 1}", "pressed" if value else "released", now))
+                    self.activity.appendleft(Activity(f"Button {index}", "pressed" if value else "released", now))
             for index, value in enumerate(snapshot.axes):
                 old = previous.axes[index] if index < len(previous.axes) else 0.0
                 if abs(value - old) >= 0.08:
@@ -114,16 +161,14 @@ class Dashboard:
 
         identity_h = 108
         identity = self.pg.Rect(left.x, left.y, left.width, identity_h)
-        visual = self.pg.Rect(left.x, identity.bottom + gap, left.width, max(180, int((left.height - identity_h - gap * 2) * 0.43)))
-        buttons = self.pg.Rect(left.x, visual.bottom + gap, left.width, left.bottom - visual.bottom - gap)
+        diagram = self.pg.Rect(left.x, identity.bottom + gap, left.width, left.bottom - identity.bottom - gap)
         axes_h = max(225, int(right.height * 0.48))
         axes = self.pg.Rect(right.x, right.y, right.width, axes_h)
         hats = self.pg.Rect(right.x, axes.bottom + gap, right.width, max(128, int((right.height - axes_h - gap * 2) * 0.48)))
         events = self.pg.Rect(right.x, hats.bottom + gap, right.width, right.bottom - hats.bottom - gap)
 
         self._draw_identity(surface, identity, usb_devices, snapshot, error)
-        self._draw_sticks(surface, visual, snapshot)
-        self._draw_buttons(surface, buttons, snapshot)
+        self._draw_controller(surface, diagram, usb_devices, snapshot)
         self._draw_axes(surface, axes, snapshot)
         self._draw_hats(surface, hats, snapshot)
         self._draw_events(surface, events, now)
@@ -144,6 +189,75 @@ class Dashboard:
             self._text(surface, controls, (rect.right - 17, rect.y + 42), color=ACCENT, font=self.font_small, anchor="topright")
         elif error and devices:
             self._text(surface, error[:54], (rect.right - 17, rect.y + 42), color=DANGER, font=self.font_small, anchor="topright")
+
+    def _draw_controller(
+        self,
+        surface: Any,
+        rect: Any,
+        devices: Sequence[USBDevice],
+        snapshot: ControllerSnapshot | None,
+    ) -> None:
+        names = " ".join(
+            [snapshot.name if snapshot else "", *(device.name for device in devices)]
+        ).casefold()
+        if self.diagram_source is not None and "t.16000m" in names:
+            self._draw_t16000m(surface, rect, snapshot)
+            return
+
+        # Unknown Thrustmaster models still get a complete dynamic view.
+        upper_h = max(150, int(rect.height * 0.48))
+        self._draw_sticks(surface, self.pg.Rect(rect.x, rect.y, rect.width, upper_h), snapshot)
+        lower = self.pg.Rect(rect.x, rect.y + upper_h + 14, rect.width, rect.height - upper_h - 14)
+        self._draw_buttons(surface, lower, snapshot)
+
+    def _draw_t16000m(self, surface: Any, rect: Any, snapshot: ControllerSnapshot | None) -> None:
+        self._panel(surface, rect, "T.16000M live layout")
+        content = self.pg.Rect(rect.x + 13, rect.y + 35, rect.width - 26, rect.height - 46)
+        source_w, source_h = self.diagram_source.get_size()
+        scale = min(content.width / source_w, content.height / source_h)
+        target_size = (max(1, int(source_w * scale)), max(1, int(source_h * scale)))
+        if self.diagram_cache is None or self.diagram_cache[0] != target_size:
+            self.diagram_cache = (target_size, self.pg.transform.smoothscale(self.diagram_source, target_size))
+        diagram = self.diagram_cache[1]
+        image_rect = diagram.get_rect(center=content.center)
+        surface.blit(diagram, image_rect)
+
+        axes = snapshot.axes if snapshot else ()
+        x_axis = axes[0] if len(axes) > 0 else 0.0
+        y_axis = axes[1] if len(axes) > 1 else 0.0
+        stick_origin = (
+            int(image_rect.x + T16000M_STICK_CENTER[0] * image_rect.width),
+            int(image_rect.y + T16000M_STICK_CENTER[1] * image_rect.height),
+        )
+        travel = max(7, int(28 * scale))
+        stick_position = (
+            int(stick_origin[0] + x_axis * travel),
+            int(stick_origin[1] + y_axis * travel),
+        )
+        self.pg.draw.circle(surface, ACCENT_DARK, stick_origin, max(7, int(14 * scale)), 2)
+        self.pg.draw.line(surface, ACCENT_DARK, stick_origin, stick_position, max(2, int(4 * scale)))
+        self.pg.draw.circle(surface, ACCENT, stick_position, max(4, int(8 * scale)))
+
+        values = snapshot.buttons if snapshot else ()
+        marker_radius = max(9, min(16, int(19 * scale)))
+        for index, (normalized_x, normalized_y) in T16000M_BUTTON_POSITIONS.items():
+            center = (
+                int(image_rect.x + normalized_x * image_rect.width),
+                int(image_rect.y + normalized_y * image_rect.height),
+            )
+            pressed = values[index] if index < len(values) else False
+            if pressed:
+                self.pg.draw.circle(surface, ACTIVE, center, marker_radius + 6, 2)
+            self.pg.draw.circle(surface, ACTIVE if pressed else PANEL_ALT, center, marker_radius)
+            self.pg.draw.circle(surface, ACTIVE if pressed else ACCENT, center, marker_radius, 2)
+            self._text(
+                surface,
+                str(index),
+                center,
+                color=BG if pressed else TEXT,
+                font=self.font_small,
+                anchor="center",
+            )
 
     def _draw_sticks(self, surface: Any, rect: Any, snapshot: ControllerSnapshot | None) -> None:
         self._panel(surface, rect, "Stick space")
@@ -185,7 +299,7 @@ class Dashboard:
             outline = ACTIVE if pressed else BORDER
             self.pg.draw.circle(surface, fill, center, radius)
             self.pg.draw.circle(surface, outline, center, radius, 2)
-            self._text(surface, str(index + 1), center, color=BG if pressed else TEXT, font=self.font_small, anchor="center")
+            self._text(surface, str(index), center, color=BG if pressed else TEXT, font=self.font_small, anchor="center")
 
     def _draw_axes(self, surface: Any, rect: Any, snapshot: ControllerSnapshot | None) -> None:
         self._panel(surface, rect, "All axes")
