@@ -1,24 +1,33 @@
-"""Command-line entry point and application loop."""
-
 from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
-import sys
 import time
-from typing import Sequence
+from collections.abc import Sequence
+from pathlib import Path
+
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+
+import pygame
 
 from .controller import ControllerManager
 from .demo import demo_snapshot
+from .ui import Dashboard
 from .usb import DEFAULT_SYSFS_ROOT, USBDevice, find_thrustmaster_devices
+
+WINDOW_SIZE = (1280, 800)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Find and visualize a Thrustmaster USB controller")
     parser.add_argument("--list", action="store_true", help="print matching USB devices and exit")
     parser.add_argument("--demo", action="store_true", help="show animated controls without hardware")
-    parser.add_argument("--sysfs-root", type=Path, default=DEFAULT_SYSFS_ROOT, help="USB sysfs root (Linux)")
+    parser.add_argument(
+        "--sysfs-root",
+        type=Path,
+        default=DEFAULT_SYSFS_ROOT,
+        help="USB sysfs root (Linux)",
+    )
     parser.add_argument("--fps", type=int, default=60, help="display refresh rate (default: 60)")
     parser.add_argument("--frames", type=int, default=0, help=argparse.SUPPRESS)
     return parser
@@ -40,26 +49,16 @@ def run(args: argparse.Namespace) -> int:
         print(describe_devices(devices))
         return 0
 
-    # Keep pygame's greeting out of a hardware utility's terminal output.
-    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-    try:
-        import pygame
-    except ImportError:
-        print("pygame-ce is required; install the project with: pip install -e .", file=sys.stderr)
-        return 2
-
-    from .ui import Dashboard
-
     pygame.init()
     pygame.joystick.init()
-    flags = pygame.RESIZABLE
-    surface = pygame.display.set_mode((1280, 800), flags)
+    surface = pygame.display.set_mode(WINDOW_SIZE, pygame.RESIZABLE)
+    canvas = pygame.Surface(WINDOW_SIZE)
     pygame.display.set_caption("Thrustmaster Controller Bring-up")
-    pygame.display.set_icon(_make_icon(pygame))
-    dashboard = Dashboard(pygame)
-    manager = ControllerManager(pygame)
+    pygame.display.set_icon(_make_icon())
+    dashboard = Dashboard()
+    manager = ControllerManager()
     if not args.demo:
-        manager.rescan(bool(devices))
+        manager.rescan()
 
     clock = pygame.time.Clock()
     started = time.monotonic()
@@ -81,7 +80,7 @@ def run(args: argparse.Namespace) -> int:
                 elif event.key == pygame.K_f:
                     fullscreen = not fullscreen
                     display_flags = pygame.FULLSCREEN if fullscreen else pygame.RESIZABLE
-                    surface = pygame.display.set_mode((0, 0) if fullscreen else (1280, 800), display_flags)
+                    surface = pygame.display.set_mode((0, 0) if fullscreen else WINDOW_SIZE, display_flags)
             elif event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
                 rescan_requested = True
 
@@ -89,12 +88,12 @@ def run(args: argparse.Namespace) -> int:
         if rescan_requested or now - last_scan >= 1.0:
             devices = find_thrustmaster_devices(args.sysfs_root)
             if not args.demo and (rescan_requested or manager.joystick is None):
-                manager.rescan(bool(devices))
+                manager.rescan()
             last_scan = now
 
-        pygame.event.pump()
         snapshot = demo_snapshot(now - started) if args.demo else manager.snapshot()
-        dashboard.render(surface, devices, snapshot, manager.error, now)
+        dashboard.render(canvas, devices, snapshot, manager.error, now)
+        pygame.transform.smoothscale(canvas, surface.get_size(), surface)
         pygame.display.flip()
         clock.tick(max(1, args.fps))
         frame_count += 1
@@ -107,10 +106,10 @@ def run(args: argparse.Namespace) -> int:
     return 0
 
 
-def _make_icon(pg: object):
-    surface = pg.Surface((32, 32), pg.SRCALPHA)
-    pg.draw.circle(surface, (43, 214, 177), (16, 16), 12, 3)
-    pg.draw.circle(surface, (255, 193, 77), (19, 13), 4)
+def _make_icon():
+    surface = pygame.Surface((32, 32), pygame.SRCALPHA)
+    pygame.draw.circle(surface, (43, 214, 177), (16, 16), 12, 3)
+    pygame.draw.circle(surface, (255, 193, 77), (19, 13), 4)
     return surface
 
 

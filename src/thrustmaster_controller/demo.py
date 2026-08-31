@@ -1,5 +1,3 @@
-"""Animated, hardware-free input used for demos and UI smoke tests."""
-
 from __future__ import annotations
 
 import math
@@ -11,10 +9,19 @@ def demo_snapshot(elapsed_seconds: float) -> ControllerSnapshot:
     phase = elapsed_seconds
     active = int(phase * 2.5) % 16
     hat_step = int(phase * 1.5) % 9
-    hats = ((-1, 1), (0, 1), (1, 1), (-1, 0), (0, 0), (1, 0), (-1, -1), (0, -1), (1, -1))
+    hats = (
+        (-1, 1),
+        (0, 1),
+        (1, 1),
+        (-1, 0),
+        (0, 0),
+        (1, 0),
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+    )
     return ControllerSnapshot(
         name="Thrustmaster T.16000M (demo)",
-        guid="demo-044f",
         axes=(
             math.sin(phase * 1.2),
             math.cos(phase * 1.0),

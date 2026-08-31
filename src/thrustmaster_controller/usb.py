@@ -1,5 +1,3 @@
-"""Dependency-free Linux USB discovery through sysfs."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,14 +10,12 @@ DEFAULT_SYSFS_ROOT = Path("/sys/bus/usb/devices")
 def _read_text(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8", errors="replace").strip()
-    except (FileNotFoundError, PermissionError, OSError):
+    except OSError:
         return ""
 
 
 @dataclass(frozen=True, slots=True)
 class USBDevice:
-    """The identifying fields exposed for a physical USB device by sysfs."""
-
     sysfs_name: str
     vendor_id: str
     product_id: str
@@ -50,16 +46,10 @@ class USBDevice:
 
 
 def iter_usb_devices(sysfs_root: Path | str = DEFAULT_SYSFS_ROOT) -> list[USBDevice]:
-    """Return physical USB devices found below *sysfs_root*.
-
-    Interface directories do not contain ``idVendor`` and are naturally
-    skipped. Missing or inaccessible roots are treated as an empty USB bus.
-    """
-
     root = Path(sysfs_root)
     try:
         entries = sorted(root.iterdir(), key=lambda path: path.name)
-    except (FileNotFoundError, PermissionError, NotADirectoryError, OSError):
+    except OSError:
         return []
 
     devices: list[USBDevice] = []
@@ -83,7 +73,7 @@ def iter_usb_devices(sysfs_root: Path | str = DEFAULT_SYSFS_ROOT) -> list[USBDev
     return devices
 
 
-def find_thrustmaster_devices(sysfs_root: Path | str = DEFAULT_SYSFS_ROOT) -> list[USBDevice]:
-    """Find devices made by, or explicitly named, Thrustmaster."""
-
+def find_thrustmaster_devices(
+    sysfs_root: Path | str = DEFAULT_SYSFS_ROOT,
+) -> list[USBDevice]:
     return [device for device in iter_usb_devices(sysfs_root) if device.is_thrustmaster]

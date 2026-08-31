@@ -26,3 +26,6 @@ thrustmaster_controller = ["assets/*.jpg"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 140

@@ -33,7 +33,13 @@ def test_finds_thrustmaster_by_vendor_id(tmp_path: Path) -> None:
 
 
 def test_finds_rebranded_device_by_name(tmp_path: Path) -> None:
-    make_device(tmp_path, "1-2", idVendor="1234", idProduct="abcd", product="Thrustmaster Prototype")
+    make_device(
+        tmp_path,
+        "1-2",
+        idVendor="1234",
+        idProduct="abcd",
+        product="Thrustmaster Prototype",
+    )
 
     assert len(find_thrustmaster_devices(tmp_path)) == 1
 

@@ -6,10 +6,9 @@ switches. The T.16000M view places zero-based buttons directly over their
 physical locations. Devices can be plugged and unplugged while the app is
 running.
 
-The bring-up was developed against a T.16000M (`044f:b10a`), but no model-specific
-button count or report layout is hard-coded. The UI is generated from the inputs
-reported by SDL, so other Thrustmaster sticks, gamepads, and wheels can be
-inspected too.
+The T.16000M (`044f:b10a`) has a model-specific diagram. Other Thrustmaster
+sticks, gamepads, and wheels use a generic layout generated from the inputs
+reported by SDL.
 
 ## Run
 
